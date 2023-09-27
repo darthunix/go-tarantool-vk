@@ -722,12 +722,12 @@ func (conn *Connection) readResponse(r io.Reader) (Response, error) {
 		return Response{}, fmt.Errorf("read error: %w", err)
 	}
 
-	resp := Response{buf: smallBuf{b: respBytes}}
+	resp := Response{Buf: smallBuf{b: respBytes}}
 	err = resp.decodeHeader(conn.dec)
 	if err != nil {
 		return resp, fmt.Errorf("decode response header error: %w", err)
 	}
-	err = resp.decodeBody()
+	err = resp.DecodeBody()
 	if err != nil {
 		switch err.(type) {
 		case Error:
@@ -957,7 +957,7 @@ func (conn *Connection) reader(r *bufio.Reader, c net.Conn) {
 			conn.reconnect(err, c)
 			return
 		}
-		resp := &Response{buf: smallBuf{b: respBytes}}
+		resp := &Response{Buf: smallBuf{b: respBytes}}
 		err = resp.decodeHeader(conn.dec)
 		if err != nil {
 			conn.reconnect(err, c)
@@ -966,7 +966,7 @@ func (conn *Connection) reader(r *bufio.Reader, c net.Conn) {
 
 		var fut *Future = nil
 		if resp.Code == EventCode {
-			if event, err := readWatchEvent(&resp.buf); err == nil {
+			if event, err := readWatchEvent(&resp.Buf); err == nil {
 				events <- event
 			} else {
 				conn.opts.Logger.Report(LogWatchEventReadFailed, conn, err)

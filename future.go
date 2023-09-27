@@ -77,7 +77,7 @@ func (it *asyncResponseIterator) Next() bool {
 		return false
 	}
 
-	if it.err = it.resp.decodeBody(); it.err != nil {
+	if it.err = it.resp.DecodeBody(); it.err != nil {
 		it.resp = nil
 		return false
 	}
@@ -183,7 +183,7 @@ func (fut *Future) Get() (*Response, error) {
 	if fut.err != nil {
 		return fut.resp, fut.err
 	}
-	err := fut.resp.decodeBody()
+	err := fut.resp.DecodeBody()
 	return fut.resp, err
 }
 

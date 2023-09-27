@@ -12,7 +12,7 @@ type Response struct {
 	Data     []interface{}
 	MetaData []ColumnMetaData
 	SQLInfo  SQLInfo
-	buf      smallBuf
+	Buf      smallBuf
 }
 
 type ColumnMetaData struct {
@@ -98,20 +98,20 @@ func (info *SQLInfo) DecodeMsgpack(d *decoder) error {
 }
 
 func (resp *Response) smallInt(d *decoder) (i int, err error) {
-	b, err := resp.buf.ReadByte()
+	b, err := resp.Buf.ReadByte()
 	if err != nil {
 		return
 	}
 	if b <= 127 {
 		return int(b), nil
 	}
-	resp.buf.UnreadByte()
+	resp.Buf.UnreadByte()
 	return d.DecodeInt()
 }
 
 func (resp *Response) decodeHeader(d *decoder) (err error) {
 	var l int
-	d.Reset(&resp.buf)
+	d.Reset(&resp.Buf)
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}
@@ -142,10 +142,10 @@ func (resp *Response) decodeHeader(d *decoder) (err error) {
 	return nil
 }
 
-func (resp *Response) decodeBody() (err error) {
-	if resp.buf.Len() > 2 {
-		offset := resp.buf.Offset()
-		defer resp.buf.Seek(offset)
+func (resp *Response) DecodeBody() (err error) {
+	if resp.Buf.Len() > 2 {
+		offset := resp.Buf.Offset()
+		defer resp.Buf.Seek(offset)
 
 		var l, larr int
 		var stmtID, bindCount uint64
@@ -153,55 +153,70 @@ func (resp *Response) decodeBody() (err error) {
 		var feature ProtocolFeature
 		var errorExtendedInfo *BoxError = nil
 
-		d := newDecoder(&resp.buf)
+		d := newDecoder(&resp.Buf)
 
 		if l, err = d.DecodeMapLen(); err != nil {
 			return err
 		}
+		fmt.Errorf("l: %d\n", l)
+		fmt.Printf("l: %d\n", l)
 		for ; l > 0; l-- {
 			var cd int
 			if cd, err = resp.smallInt(d); err != nil {
 				return err
 			}
+			fmt.Printf("cd: %d\n", cd)
 			switch cd {
 			case KeyData:
+				fmt.Printf("KeyData\n")
 				var res interface{}
 				var ok bool
 				if res, err = d.DecodeInterface(); err != nil {
 					return err
 				}
+				fmt.Printf("res: %v\n", res)
+				fmt.Printf("resp.Data: %v\n", resp.Data)
 				if resp.Data, ok = res.([]interface{}); !ok {
 					return fmt.Errorf("result is not array: %v", res)
 				}
+				fmt.Printf("resp.Data: %v\n", resp.Data)
 			case KeyError:
+				fmt.Printf("KeyError\n")
 				if errorExtendedInfo, err = decodeBoxError(d); err != nil {
 					return err
 				}
 			case KeyError24:
+				fmt.Printf("KeyError24\n")
 				if resp.Error, err = d.DecodeString(); err != nil {
 					return err
 				}
 			case KeySQLInfo:
+				fmt.Printf("KeySQLInfo\n")
 				if err = d.Decode(&resp.SQLInfo); err != nil {
 					return err
 				}
 			case KeyMetaData:
+				fmt.Printf("KeyMetaData\n")
 				if err = d.Decode(&resp.MetaData); err != nil {
 					return err
 				}
 			case KeyStmtID:
+				fmt.Printf("KeyStmtID\n")
 				if stmtID, err = d.DecodeUint64(); err != nil {
 					return err
 				}
 			case KeyBindCount:
+				fmt.Printf("KeyBindCount\n")
 				if bindCount, err = d.DecodeUint64(); err != nil {
 					return err
 				}
 			case KeyVersion:
+				fmt.Printf("KeyVersion\n")
 				if err = d.Decode(&serverProtocolInfo.Version); err != nil {
 					return err
 				}
 			case KeyFeatures:
+				fmt.Printf("KeyFeatures\n")
 				if larr, err = d.DecodeArrayLen(); err != nil {
 					return err
 				}
@@ -214,6 +229,7 @@ func (resp *Response) decodeBody() (err error) {
 					serverProtocolInfo.Features[i] = feature
 				}
 			case KeyAuthType:
+				fmt.Printf("KeyAuthType\n")
 				var auth string
 				if auth, err = d.DecodeString(); err != nil {
 					return err
@@ -229,11 +245,13 @@ func (resp *Response) decodeBody() (err error) {
 					return fmt.Errorf("unknown auth type %s", auth)
 				}
 			default:
+				fmt.Printf("default\n")
 				if err = d.Skip(); err != nil {
 					return err
 				}
 			}
 		}
+		fmt.Println("Meta data: ", resp.MetaData)
 		if stmtID != 0 {
 			stmt := &Prepared{
 				StatementID: PreparedID(stmtID),
@@ -263,14 +281,14 @@ func (resp *Response) decodeBody() (err error) {
 }
 
 func (resp *Response) decodeBodyTyped(res interface{}) (err error) {
-	if resp.buf.Len() > 0 {
-		offset := resp.buf.Offset()
-		defer resp.buf.Seek(offset)
+	if resp.Buf.Len() > 0 {
+		offset := resp.Buf.Offset()
+		defer resp.Buf.Seek(offset)
 
 		var errorExtendedInfo *BoxError = nil
 
 		var l int
-		d := newDecoder(&resp.buf)
+		d := newDecoder(&resp.Buf)
 		if l, err = d.DecodeMapLen(); err != nil {
 			return err
 		}
